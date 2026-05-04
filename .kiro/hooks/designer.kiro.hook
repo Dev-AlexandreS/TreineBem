@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "designer",
+  "description": "Tem por objetivo deixar prezar pela usabilidade, modernidade e estilo da pagina ",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Tem por objetivo deixar prezar pela usabilidade, modernidade e estilo da pagina, sempre deixando elas responsivas e otimizadas"
+  }
+}

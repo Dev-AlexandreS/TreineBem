@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  goals               Goals[]
+  weekly_plans        WeeklyPlan[]
+  exercises           Exercise[]
+  daily_logs          DailyLog[]
+  exercise_executions ExerciseExecution[]
+  cardio_logs         CardioLog[]
+
+  @@map("users")
+}
+
+model Goals {
+  id                    String   @id @default(uuid())
+  user_id               String
+  initial_weight        Decimal?
+  current_weight        Decimal?
+  target_weight         Decimal?
+  daily_water_liters    Decimal?
+  weekly_workouts       Int?
+  weekly_cardio_minutes Int?
+  created_at            DateTime @default(now()) @db.Timestamptz
+  updated_at            DateTime @updatedAt @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("goals")
+}
+
+model WeeklyPlan {
+  id          String   @id @default(uuid())
+  user_id     String
+  day_of_week String
+  day_type    String
+  title       String?
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+
+  user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  exercises Exercise[]
+
+  @@unique([user_id, day_of_week])
+  @@map("weekly_plans")
+}
+
+model Exercise {
+  id             String   @id @default(uuid())
+  user_id        String
+  weekly_plan_id String
+  name           String
+  muscle_group   String
+  planned_sets   Int
+  planned_reps   String
+  planned_weight Decimal?
+  rest_seconds   Int?
+  notes          String?
+  order_index    Int
+  created_at     DateTime @default(now()) @db.Timestamptz
+  updated_at     DateTime @updatedAt @db.Timestamptz
+
+  user        User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  weekly_plan WeeklyPlan @relation(fields: [weekly_plan_id], references: [id], onDelete: Cascade)
+
+  @@map("exercises")
+}
+
+model DailyLog {
+  id                      String   @id @default(uuid())
+  user_id                 String
+  date                    DateTime @db.Date
+  weight                  Decimal?
+  water_liters            Decimal?
+  trained                 Boolean
+  followed_plan           Boolean
+  did_something_different Boolean
+  different_description   String?
+  notes                   String?
+  created_at              DateTime @default(now()) @db.Timestamptz
+  updated_at              DateTime @updatedAt @db.Timestamptz
+
+  user                User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  exercise_executions ExerciseExecution[]
+  cardio_logs         CardioLog[]
+
+  @@unique([user_id, date])
+  @@map("daily_logs")
+}
+
+model ExerciseExecution {
+  id             String   @id @default(uuid())
+  user_id        String
+  daily_log_id   String
+  exercise_id    String?
+  exercise_name  String
+  sets_completed Int?
+  reps_completed Int?
+  weight_used    Decimal?
+  completed      Boolean
+  notes          String?
+  created_at     DateTime @default(now()) @db.Timestamptz
+  updated_at     DateTime @updatedAt @db.Timestamptz
+
+  user      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  daily_log DailyLog @relation(fields: [daily_log_id], references: [id], onDelete: Cascade)
+
+  @@map("exercise_executions")
+}
+
+model CardioLog {
+  id               String   @id @default(uuid())
+  user_id          String
+  daily_log_id     String
+  type             String
+  duration_minutes Int
+  notes            String?
+  created_at       DateTime @default(now()) @db.Timestamptz
+
+  user      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  daily_log DailyLog @relation(fields: [daily_log_id], references: [id], onDelete: Cascade)
+
+  @@map("cardio_logs")
+}
