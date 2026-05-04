@@ -152,7 +152,10 @@ export default function SideNav({ isLoggedIn = false }: { isLoggedIn?: boolean }
     >
       {/* App name */}
       <div className="px-4 py-5 border-b border-gray-700">
-        <span className="text-lg font-bold text-white">Treine Bem</span>
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.png" alt="" aria-hidden="true" className="w-8 h-8 shrink-0 rounded-lg" />
+          <span className="text-lg font-bold text-white">Treine Bem</span>
+        </div>
       </div>
 
       {/* Nav links */}
