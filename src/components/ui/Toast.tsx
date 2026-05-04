@@ -1,19 +1,25 @@
 'use client'
 
 import { useEffect } from 'react'
+import type { ToastItem } from '@/hooks/useToast'
+
+// ─── Single Toast Item ────────────────────────────────────────────────────────
 
 export interface ToastProps {
   message: string
   type: 'success' | 'error'
   onClose: () => void
+  /** Duração em ms antes do auto-close (padrão: 3000 para sucesso, 5000 para erro) */
+  duration?: number
 }
 
-export default function Toast({ message, type, onClose }: ToastProps) {
-  // Auto-close after 2 seconds (requirement 10.9 / 10.10)
+export function ToastSingle({ message, type, onClose, duration }: ToastProps) {
+  const autoCloseDuration = duration ?? (type === 'success' ? 3000 : 5000)
+
   useEffect(() => {
-    const timer = setTimeout(onClose, 2000)
+    const timer = setTimeout(onClose, autoCloseDuration)
     return () => clearTimeout(timer)
-  }, [onClose])
+  }, [onClose, autoCloseDuration])
 
   const isSuccess = type === 'success'
 
@@ -23,11 +29,9 @@ export default function Toast({ message, type, onClose }: ToastProps) {
       aria-live="assertive"
       aria-atomic="true"
       className={[
-        'fixed bottom-20 left-1/2 -translate-x-1/2 z-[100]',
         'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg',
         'text-sm font-medium text-white',
         'min-w-[240px] max-w-[90vw]',
-        'md:bottom-6',
         isSuccess ? 'bg-green-600' : 'bg-red-600',
       ].join(' ')}
     >
@@ -87,6 +91,72 @@ export default function Toast({ message, type, onClose }: ToastProps) {
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
+    </div>
+  )
+}
+
+// ─── Toast Stack (multi-toast) ────────────────────────────────────────────────
+
+export interface ToastStackProps {
+  toasts: ToastItem[]
+  onDismiss: (id: string) => void
+}
+
+/**
+ * Renderiza uma pilha de toasts empilhados verticalmente.
+ * Posicionamento: canto superior direito em desktop, parte inferior centralizada em mobile.
+ *
+ * Requirements: 3.3, 3.4, 3.5
+ */
+export function ToastStack({ toasts, onDismiss }: ToastStackProps) {
+  if (toasts.length === 0) return null
+
+  return (
+    <div
+      aria-live="assertive"
+      aria-atomic="false"
+      className={[
+        'fixed z-[100] flex flex-col gap-2',
+        // Mobile: parte inferior centralizada
+        'bottom-20 left-1/2 -translate-x-1/2',
+        // Desktop: canto superior direito
+        'md:bottom-auto md:top-4 md:right-4 md:left-auto md:translate-x-0',
+        'md:items-end',
+      ].join(' ')}
+    >
+      {toasts.map((toast) => (
+        <ToastSingle
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => onDismiss(toast.id)}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ─── Default export (backward compat) ────────────────────────────────────────
+
+/**
+ * Componente Toast legado — mantido para compatibilidade com código existente.
+ * Para novos usos, prefira `useToast` + `ToastStack`.
+ */
+export default function Toast({ message, type, onClose, duration }: ToastProps) {
+  return (
+    <div
+      className={[
+        'fixed bottom-20 left-1/2 -translate-x-1/2 z-[100]',
+        'md:bottom-auto md:top-4 md:right-4 md:left-auto md:translate-x-0',
+      ].join(' ')}
+    >
+      <ToastSingle
+        message={message}
+        type={type}
+        onClose={onClose}
+        duration={duration}
+      />
     </div>
   )
 }

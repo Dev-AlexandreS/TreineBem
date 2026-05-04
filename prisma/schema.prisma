@@ -20,6 +20,7 @@ model User {
   daily_logs          DailyLog[]
   exercise_executions ExerciseExecution[]
   cardio_logs         CardioLog[]
+  progress_photos     ProgressPhoto[]
 
   @@map("users")
 }
@@ -133,4 +134,18 @@ model CardioLog {
   daily_log DailyLog @relation(fields: [daily_log_id], references: [id], onDelete: Cascade)
 
   @@map("cardio_logs")
+}
+
+model ProgressPhoto {
+  id           String   @id @default(uuid())
+  user_id      String
+  date         DateTime @db.Date
+  storage_path String
+  created_at   DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([date])
+  @@map("progress_photos")
 }

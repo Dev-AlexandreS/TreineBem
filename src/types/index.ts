@@ -126,6 +126,15 @@ export interface StorageService {
   // Goals
   getGoals(): Goals | null;
   saveGoals(goals: Goals): void;
+
+  // User Settings
+  getUserSettings(): UserSettings | null;
+  saveUserSettings(settings: UserSettings): void;
+
+  // Progress Photos
+  getProgressPhotos(): ProgressPhoto[];
+  saveProgressPhoto(photo: ProgressPhoto): void;
+  deleteProgressPhoto(id: string): void;
 }
 
 // ─── Validation Interfaces ────────────────────────────────────────────────────
@@ -160,4 +169,37 @@ export class StorageError extends Error {
     // Restore prototype chain (required when extending built-in classes in TypeScript)
     Object.setPrototypeOf(this, new.target.prototype);
   }
+}
+
+// ─── User Settings ────────────────────────────────────────────────────────────
+
+/**
+ * Configurações pessoais do usuário armazenadas localmente.
+ * Usadas para cálculo de IMC e personalização do app.
+ *
+ * Requirements: 13.1, 14.2
+ */
+export interface UserSettings {
+  /** Nome de exibição do usuário */
+  displayName?: string;
+  /** Altura em cm (inteiro 100–250) */
+  heightCm?: number;
+  /** Data de nascimento (ISO date string YYYY-MM-DD) */
+  birthDate?: ISODateString;
+}
+
+// ─── Progress Photo ───────────────────────────────────────────────────────────
+
+/**
+ * Foto de progresso corporal do usuário.
+ *
+ * Requirements: 15.3
+ */
+export interface ProgressPhoto {
+  id: string;
+  date: ISODateString;
+  /** URL pública do Supabase Storage ou blob URL (dev) */
+  url: string;
+  /** Caminho no bucket do Supabase Storage */
+  storagePath?: string;
 }

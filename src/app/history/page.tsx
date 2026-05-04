@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { storageService } from '@/lib/storage/storage.service'
+import EmptyState from '@/components/ui/EmptyState'
 import type { DailyLog, ExerciseExecution, ISODateString } from '@/types'
 
-// ─── Period filter types ──────────────────────────────────────────────────────
+// ─── Period filter ────────────────────────────────────────────────────────────
 
 type PeriodFilter = 'week' | 'month' | 'all'
 
@@ -20,12 +21,9 @@ function toISO(date: Date): ISODateString {
   return date.toISOString().split('T')[0]
 }
 
-/**
- * Returns the Monday of the current week (ISO week: Mon–Sun).
- */
 function getWeekStart(): Date {
   const today = new Date()
-  const day = today.getDay() // 0 = Sun, 1 = Mon, …
+  const day = today.getDay()
   const diff = day === 0 ? -6 : 1 - day
   const monday = new Date(today)
   monday.setDate(today.getDate() + diff)
@@ -33,35 +31,25 @@ function getWeekStart(): Date {
   return monday
 }
 
-/**
- * Returns the Sunday of the current week.
- */
 function getWeekEnd(): Date {
   const monday = getWeekStart()
   const sunday = new Date(monday)
   sunday.setDate(monday.getDate() + 6)
-  sunday.setHours(23, 59, 59, 999)
   return sunday
 }
 
-/**
- * Returns the first day of the current month.
- */
 function getMonthStart(): Date {
   const today = new Date()
   return new Date(today.getFullYear(), today.getMonth(), 1)
 }
 
-/**
- * Returns the last day of the current month.
- */
 function getMonthEnd(): Date {
   const today = new Date()
   return new Date(today.getFullYear(), today.getMonth() + 1, 0)
 }
 
 /**
- * Formats an ISO date string for display (e.g. "seg, 12 jan 2025").
+ * Formata data ISO para exibição: "seg, 12 jan 2025"
  */
 function formatDate(iso: ISODateString): string {
   const [year, month, day] = iso.split('-').map(Number)
@@ -74,7 +62,7 @@ function formatDate(iso: ISODateString): string {
   })
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Log List Item ────────────────────────────────────────────────────────────
 
 interface LogListItemProps {
   log: DailyLog
@@ -89,33 +77,42 @@ function LogListItem({ log, isSelected, onClick }: LogListItemProps) {
       onClick={onClick}
       aria-pressed={isSelected}
       className={[
-        'w-full text-left rounded-xl border px-4 py-3 transition-colors',
+        'w-full text-left rounded-2xl border px-4 py-3 transition-colors',
         isSelected
           ? 'bg-blue-900/40 border-blue-600'
-          : 'bg-gray-800 border-gray-700 hover:bg-gray-750 hover:border-gray-600',
+          : log.followedPlan
+          ? 'bg-gray-800 border-blue-700/50 hover:border-blue-600'
+          : 'bg-gray-800 border-gray-700 hover:border-gray-600',
       ].join(' ')}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         {/* Date */}
         <span className="text-sm font-medium text-white capitalize">
           {formatDate(log.date)}
         </span>
 
-        {/* Trained indicator */}
-        <span
-          aria-label={log.trained ? 'Treinou' : 'Não treinou'}
-          className={[
-            'shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold',
-            log.trained
-              ? 'bg-green-900/60 text-green-400'
-              : 'bg-gray-700 text-gray-400',
-          ].join(' ')}
-        >
-          {log.trained ? '✓ Treinou' : '— Descanso'}
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Seguiu o plano badge (Req 8.5) */}
+          {log.followedPlan && (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-900/60 text-blue-400 border border-blue-700/50">
+              📋 Seguiu o plano
+            </span>
+          )}
+          {/* Treinou badge (Req 8.4) */}
+          <span
+            className={[
+              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold',
+              log.trained
+                ? 'bg-green-900/60 text-green-400'
+                : 'bg-gray-700 text-gray-400',
+            ].join(' ')}
+          >
+            {log.trained ? '✓ Treinou' : '— Descanso'}
+          </span>
+        </div>
       </div>
 
-      {/* Metrics row */}
+      {/* Métricas (Req 8.4) */}
       {(log.weight !== undefined || log.waterLiters !== undefined) && (
         <div className="mt-1.5 flex gap-3 text-xs text-gray-400">
           {log.weight !== undefined && (
@@ -130,23 +127,19 @@ function LogListItem({ log, isSelected, onClick }: LogListItemProps) {
   )
 }
 
-interface ExecutionListProps {
-  executions: ExerciseExecution[]
-}
+// ─── Execution List ───────────────────────────────────────────────────────────
 
-function ExecutionList({ executions }: ExecutionListProps) {
+function ExecutionList({ executions }: { executions: ExerciseExecution[] }) {
   if (executions.length === 0) return null
 
   return (
-    <div className="mt-4">
-      <h3 className="text-sm font-semibold text-gray-300 mb-2">
-        Exercícios executados
-      </h3>
+    <div className="mt-4 space-y-2">
+      <h3 className="text-sm font-semibold text-gray-300">Exercícios executados</h3>
       <ul className="space-y-2" aria-label="Exercícios executados">
         {executions.map((ex) => (
           <li
             key={ex.id}
-            className="rounded-lg bg-gray-900 border border-gray-700 px-3 py-2"
+            className="rounded-xl bg-gray-700/50 border border-gray-700 px-3 py-2.5"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-white truncate">
@@ -158,7 +151,7 @@ function ExecutionList({ executions }: ExecutionListProps) {
                   ex.completed ? 'text-green-400' : 'text-gray-500',
                 ].join(' ')}
               >
-                {ex.completed ? '✓ Concluído' : 'Incompleto'}
+                {ex.completed ? '✓' : '○'}
               </span>
             </div>
             <p className="text-xs text-gray-400 mt-0.5">
@@ -175,21 +168,16 @@ function ExecutionList({ executions }: ExecutionListProps) {
   )
 }
 
-interface LogDetailProps {
-  log: DailyLog
-  executions: ExerciseExecution[]
-}
+// ─── Log Detail ───────────────────────────────────────────────────────────────
 
-function LogDetail({ log, executions }: LogDetailProps) {
+function LogDetail({ log, executions }: { log: DailyLog; executions: ExerciseExecution[] }) {
   return (
     <div className="rounded-2xl bg-gray-800 border border-gray-700 p-4 space-y-3">
-      {/* Header */}
       <h2 className="text-base font-semibold text-white capitalize">
         {formatDate(log.date)}
       </h2>
 
-      {/* Metrics */}
-      <dl className="grid grid-cols-2 gap-2 text-sm">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         {log.weight !== undefined && (
           <>
             <dt className="text-gray-400">Peso</dt>
@@ -207,7 +195,7 @@ function LogDetail({ log, executions }: LogDetailProps) {
           {log.trained ? 'Sim' : 'Não'}
         </dd>
         <dt className="text-gray-400">Seguiu o plano</dt>
-        <dd className={log.followedPlan ? 'text-green-400 font-medium' : 'text-gray-400'}>
+        <dd className={log.followedPlan ? 'text-blue-400 font-medium' : 'text-gray-400'}>
           {log.followedPlan ? 'Sim' : 'Não'}
         </dd>
         {log.didSomethingDifferent && (
@@ -218,23 +206,20 @@ function LogDetail({ log, executions }: LogDetailProps) {
         )}
       </dl>
 
-      {/* Different description */}
       {log.didSomethingDifferent && log.differentDescription && (
-        <div className="rounded-lg bg-gray-900 border border-gray-700 px-3 py-2">
+        <div className="rounded-lg bg-gray-700/50 border border-gray-700 px-3 py-2">
           <p className="text-xs text-gray-400 mb-0.5">Descrição</p>
           <p className="text-sm text-white">{log.differentDescription}</p>
         </div>
       )}
 
-      {/* Notes */}
       {log.notes && (
-        <div className="rounded-lg bg-gray-900 border border-gray-700 px-3 py-2">
+        <div className="rounded-lg bg-gray-700/50 border border-gray-700 px-3 py-2">
           <p className="text-xs text-gray-400 mb-0.5">Observações</p>
           <p className="text-sm text-white">{log.notes}</p>
         </div>
       )}
 
-      {/* Exercise executions */}
       <ExecutionList executions={executions} />
     </div>
   )
@@ -243,11 +228,9 @@ function LogDetail({ log, executions }: LogDetailProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 /**
- * History page — lists DailyLogs in descending chronological order with
- * period filters (current week, current month, all). Selecting a log shows
- * its details including associated ExerciseExecutions.
+ * Histórico de registros diários com filtros de período e detalhes completos.
  *
- * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8
+ * Requirements: 8.1–8.8
  */
 export default function HistoryPage() {
   const [filter, setFilter] = useState<PeriodFilter>('week')
@@ -255,7 +238,7 @@ export default function HistoryPage() {
   const [selectedLog, setSelectedLog] = useState<DailyLog | null>(null)
   const [executions, setExecutions] = useState<ExerciseExecution[]>([])
 
-  // ── Load logs for the selected period ────────────────────────────────────
+  // ── Load logs ─────────────────────────────────────────────────────────────
 
   const loadLogs = useCallback((period: PeriodFilter) => {
     let from: ISODateString
@@ -268,14 +251,12 @@ export default function HistoryPage() {
       from = toISO(getMonthStart())
       to = toISO(getMonthEnd())
     } else {
-      // 'all' — use a wide range that covers any realistic data
       from = '2000-01-01'
       to = '2099-12-31'
     }
 
     const fetched = storageService.getDailyLogs(from, to)
-
-    // Sort descending (most recent first) — Requirement 7.2
+    // Ordem decrescente (Req 8.1)
     const sorted = [...fetched].sort((a, b) => (a.date < b.date ? 1 : -1))
     setLogs(sorted)
     setSelectedLog(null)
@@ -286,34 +267,27 @@ export default function HistoryPage() {
     loadLogs(filter)
   }, [filter, loadLogs])
 
-  // ── Load executions when a log is selected ────────────────────────────────
+  // ── Select log ────────────────────────────────────────────────────────────
 
   function handleSelectLog(log: DailyLog) {
     if (selectedLog?.date === log.date) {
-      // Toggle off
       setSelectedLog(null)
       setExecutions([])
       return
     }
     setSelectedLog(log)
-    const execs = storageService.getExerciseExecutions(log.date)
-    setExecutions(execs)
+    setExecutions(storageService.getExerciseExecutions(log.date))
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 max-w-2xl mx-auto space-y-6">
-      {/* Header */}
+    <div className="p-4 max-w-2xl mx-auto space-y-5 pb-24">
       <h1 className="text-2xl font-bold text-white">Histórico</h1>
 
-      {/* Period filter — Requirement 7.3 */}
+      {/* Filtros de período (Req 8.2–8.3) */}
       <section aria-label="Filtro de período">
-        <div
-          role="group"
-          aria-label="Filtrar por período"
-          className="flex gap-2 flex-wrap"
-        >
+        <div role="group" aria-label="Filtrar por período" className="flex gap-2 flex-wrap">
           {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((period) => (
             <button
               key={period}
@@ -333,15 +307,14 @@ export default function HistoryPage() {
         </div>
       </section>
 
-      {/* Log list — Requirements 7.2, 7.4, 7.7 */}
+      {/* Lista de registros */}
       <section aria-label="Lista de registros diários">
         {logs.length === 0 ? (
-          // Requirement 7.8 — no data message
-          <div className="rounded-2xl bg-gray-800 border border-gray-700 p-6 text-center">
-            <p className="text-gray-400 text-sm">
-              Nenhum registro encontrado para o período selecionado.
-            </p>
-          </div>
+          // Estado vazio (Req 8.8)
+          <EmptyState
+            icon="📋"
+            message="Nenhum registro encontrado para o período selecionado."
+          />
         ) : (
           <ul className="space-y-2" aria-label="Registros diários">
             {logs.map((log) => (
@@ -357,7 +330,7 @@ export default function HistoryPage() {
         )}
       </section>
 
-      {/* Log detail — Requirements 7.5, 7.6 */}
+      {/* Detalhes do registro (Req 8.6–8.7) */}
       {selectedLog !== null && (
         <section aria-label="Detalhes do registro">
           <LogDetail log={selectedLog} executions={executions} />

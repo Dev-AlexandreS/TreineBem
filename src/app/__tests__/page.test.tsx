@@ -68,11 +68,16 @@ const defaultDashboardData = {
   averageWater: 2.3,
   todayPlan: workoutDayPlan,
   todayDayType: 'workout' as const,
+  todayLog: null,
   allLogs: [makeLog('2024-01-01', { weight: 90 }), makeLog('2024-01-02', { weight: 89 })],
   weeklyPlan: null,
   goals: null,
+  weekSummary: null,
+  weekConsistencyDays: [],
+  isPerfectWeekResult: false,
   isLoading: false,
   error: null,
+  saveDailyCheckin: vi.fn().mockResolvedValue(undefined),
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -162,7 +167,8 @@ describe('DashboardPage', () => {
       todayDayType: null,
     })
     render(<DashboardPage />)
-    expect(screen.getByText('Dia de descanso')).toBeInTheDocument()
+    // When todayPlan is null, shows a message to configure the weekly plan
+    expect(screen.getByText(/Configure seu plano semanal/)).toBeInTheDocument()
   })
 
   it('shows "Dia de descanso" when todayDayType is "rest"', () => {
@@ -172,7 +178,7 @@ describe('DashboardPage', () => {
       todayDayType: 'rest',
     })
     render(<DashboardPage />)
-    expect(screen.getByText('Dia de descanso')).toBeInTheDocument()
+    expect(screen.getByText(/Dia de descanso/)).toBeInTheDocument()
   })
 
   // ── Requirement 1.10–1.12: charts are rendered ───────────────────────────────
@@ -205,6 +211,7 @@ describe('DashboardPage', () => {
       currentWeight: null,
       targetWeight: null,
       weightLost: null,
+      goals: { initialWeight: 90, targetWeight: 80, dailyWaterLiters: 2, weeklyWorkouts: 3, weeklyCardioMinutes: 60 },
     })
     render(<DashboardPage />)
     // MetricCard renders "—" for null values
