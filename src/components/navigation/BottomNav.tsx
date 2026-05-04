@@ -117,7 +117,7 @@ const navItems = [
   },
 ]
 
-export default function BottomNav() {
+export default function BottomNav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const pathname = usePathname()
 
   return (
@@ -147,10 +147,12 @@ export default function BottomNav() {
         )
       })}
 
-      {/* Logout */}
-      <div className="flex flex-1 flex-col items-center justify-center gap-1 min-h-[44px] min-w-[44px] px-1 py-2">
-        <LogoutButton />
-      </div>
+      {/* Logout — only shown when logged in */}
+      {isLoggedIn && (
+        <div className="flex flex-1 flex-col items-center justify-center gap-1 min-h-[44px] min-w-[44px] px-1 py-2">
+          <LogoutButton />
+        </div>
+      )}
     </nav>
   )
 }

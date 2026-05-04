@@ -36,10 +36,10 @@ export default async function RootLayout({
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} dark`}
     >
-      <body className="min-h-screen bg-background text-foreground antialiased">
+      <body className="min-h-screen bg-background text-foreground antialiased" suppressHydrationWarning>
         <StorageProvider userId={user?.id ?? null}>
           {/* Sidebar: visible on desktop (md+) */}
-          <SideNav />
+          <SideNav isLoggedIn={!!user} />
 
           {/* Main content area:
               - pb-16 on mobile to clear the fixed BottomNav (h ~64px)
@@ -49,7 +49,7 @@ export default async function RootLayout({
           </main>
 
           {/* Bottom nav: visible on mobile only (hidden on md+) */}
-          <BottomNav />
+          <BottomNav isLoggedIn={!!user} />
         </StorageProvider>
       </body>
     </html>

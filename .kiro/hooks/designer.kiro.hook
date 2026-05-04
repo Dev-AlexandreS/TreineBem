@@ -8,6 +8,8 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Tem por objetivo deixar prezar pela usabilidade, modernidade e estilo da pagina, sempre deixando elas responsivas e otimizadas"
-  }
+    "prompt": "Tem por objetivo  prezar pela usabilidade, modernidade e estilo da pagina, sempre deixando elas responsivas e otimizadas e obviamente bonitas"
+  },
+  "workspaceFolderName": "TreineBem",
+  "shortName": "designer"
 }

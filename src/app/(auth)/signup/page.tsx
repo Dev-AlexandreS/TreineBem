@@ -27,7 +27,6 @@ export default function SignupPage() {
 
     if (error) {
       setLoading(false);
-      // Supabase returns a 422 or specific message for duplicate emails
       const isDuplicate =
         error.status === 422 ||
         error.message?.toLowerCase().includes('already registered') ||
@@ -35,14 +34,31 @@ export default function SignupPage() {
         error.code === 'user_already_exists';
       const message = isDuplicate
         ? 'Este email já está cadastrado.'
-        : 'Erro ao criar conta. Tente novamente.';
+        : `Erro: ${error.message}`;
       setToast({ message, type: 'error' });
       return;
     }
 
     const user = data.user;
+    const session = data.session;
+
+    // If session is null but user exists, email confirmation is required
+    if (!session && user) {
+      setLoading(false);
+      setToast({
+        message: 'Conta criada! Verifique seu email para confirmar o cadastro.',
+        type: 'success',
+      });
+      return;
+    }
+
     if (user) {
-      await createUserRecord(user.id, email, name);
+      try {
+        await createUserRecord(user.id, email, name);
+      } catch (err) {
+        console.error('[signup] createUserRecord failed:', err);
+        // User was created in Supabase Auth — still proceed
+      }
     }
 
     setLoading(false);

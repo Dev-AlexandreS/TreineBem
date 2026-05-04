@@ -32,7 +32,7 @@ vi.mock('next/server', () => {
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
-import { middleware } from '../../middleware';
+import { proxy as middleware } from '../proxy';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

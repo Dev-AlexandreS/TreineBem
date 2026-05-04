@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "Tester QA",
+  "description": "Quem irá testar todas as funcionalidades",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "deve testar todas as funcionalidades da aplicação, inclusive conexão com o banco e integridade da aplicação"
+  }
+}

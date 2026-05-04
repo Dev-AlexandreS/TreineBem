@@ -250,8 +250,8 @@ The `SupabaseAdapter` is server-side only — it imports Prisma and must never b
     - Tag: `// Feature: supabase-vercel-migration, Property 7: Adapter errors are always wrapped as StorageError`
     - _Requirements: 5.11_
 
-- [-] 12. Unit tests for adapter methods and auth forms
-  - [-] 12.1 Write unit tests for `SupabaseAdapter` method behaviour
+- [x] 12. Unit tests for adapter methods and auth forms
+  - [x] 12.1 Write unit tests for `SupabaseAdapter` method behaviour
     - File: `src/lib/storage/__tests__/supabase.adapter.test.ts`
     - Test `getWeeklyPlan` returns mapped data when rows exist.
     - Test `saveDailyLog` calls upsert with correct mapped fields.
