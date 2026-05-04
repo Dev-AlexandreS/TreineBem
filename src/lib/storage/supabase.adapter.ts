@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
-import { Prisma } from '@/generated/prisma';
+import { Prisma } from '@prisma/client';
 import { defaultWeeklyPlan } from './defaultPlan';
 import {
   StorageError,

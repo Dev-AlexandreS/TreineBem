@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "Product",
+  "description": "deve ver possiveis features futuras para a aplicação",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "deve ver possiveis features futuras para a aplicação"
+  }
+}

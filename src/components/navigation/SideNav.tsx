@@ -117,7 +117,7 @@ const navItems = [
   },
 ]
 
-export default function SideNav() {
+export default function SideNav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const pathname = usePathname()
 
   return (
@@ -156,10 +156,12 @@ export default function SideNav() {
         })}
       </ul>
 
-      {/* Logout */}
-      <div className="p-4 border-t border-gray-700">
-        <LogoutButton />
-      </div>
+      {/* Logout — only shown when logged in */}
+      {isLoggedIn && (
+        <div className="p-4 border-t border-gray-700">
+          <LogoutButton />
+        </div>
+      )}
     </nav>
   )
 }
