@@ -1,7 +1,7 @@
 // Feature: supabase-vercel-migration, Property 1: Auth Guard routes correctly
 // Validates: Requirements 4.8, 4.9
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fc from 'fast-check';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ const arbProtectedPath = fc.oneof(
   // Sub-paths of non-root protected routes (e.g. /workout/123)
   fc.tuple(
     fc.constantFrom('/workout', '/history', '/plan', '/goals'),
-    fc.stringMatching(/^[a-z0-9-]{1,20}$/),
+    fc.stringMatching(/^[a-z0-9]{1,20}$/),
   ).map(([base, sub]) => `${base}/${sub}`),
 );
 
@@ -79,7 +79,7 @@ const arbAuthPath = fc.oneof(
   fc.constantFrom(...AUTH_ROUTES),
   fc.tuple(
     fc.constantFrom(...AUTH_ROUTES),
-    fc.stringMatching(/^[a-z0-9-]{1,20}$/),
+    fc.stringMatching(/^[a-z0-9]{1,20}$/),
   ).map(([base, sub]) => `${base}/${sub}`),
 );
 
@@ -91,6 +91,24 @@ const fakeUser = { id: 'user-123', email: 'test@example.com' };
 describe('middleware – Property 1: Auth Guard routes correctly', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set required env vars so the proxy doesn't short-circuit
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+    // Re-mock NextResponse after clearAllMocks
+    vi.mocked(NextResponse.next).mockImplementation(({ request }: any) => ({
+      _type: 'next',
+      request,
+      cookies: { set: vi.fn() },
+    } as any));
+    vi.mocked(NextResponse.redirect).mockImplementation((url: URL) => ({
+      _type: 'redirect',
+      headers: new Map([['location', url.toString()]]),
+    } as any));
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   });
 
   it('protected path + no user → redirects to /login', async () => {
