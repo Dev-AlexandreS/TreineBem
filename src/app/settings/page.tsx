@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import SkeletonCard from '@/components/ui/SkeletonCard'
 import { ToastStack } from '@/components/ui/Toast'
 import ProgressPhotoGallery from '@/components/settings/ProgressPhotoGallery'
+import FullScreenLoader from '@/components/ui/FullScreenLoader'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -33,6 +34,7 @@ export default function SettingsPage() {
   const [heightError, setHeightError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
 
   // ── Load user email from Supabase ──────────────────────────────────────────
@@ -91,6 +93,7 @@ export default function SettingsPage() {
   }
 
   async function handleLogout() {
+    setIsLoggingOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
@@ -132,6 +135,8 @@ export default function SettingsPage() {
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-6 pb-24">
       <ToastStack toasts={toasts} onDismiss={dismiss} />
+
+      {isLoggingOut && <FullScreenLoader message="Saindo..." />}
 
       <ConfirmDialog
         isOpen={showLogoutConfirm}

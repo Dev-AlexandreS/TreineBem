@@ -140,6 +140,11 @@ const navItems = [
 export default function SideNav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const pathname = usePathname()
 
+  // Filter out settings when not logged in
+  const visibleItems = navItems.filter(
+    (item) => item.href !== '/settings' || isLoggedIn
+  )
+
   return (
     <nav
       className="fixed top-0 left-0 bottom-0 z-50 hidden md:flex flex-col w-56 bg-gray-900 border-r border-gray-700"
@@ -152,7 +157,7 @@ export default function SideNav({ isLoggedIn = false }: { isLoggedIn?: boolean }
 
       {/* Nav links */}
       <ul className="flex flex-col gap-1 p-3 flex-1">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
 

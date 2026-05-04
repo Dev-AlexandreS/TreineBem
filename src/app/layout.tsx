@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/navigation/BottomNav";
 import SideNav from "@/components/navigation/SideNav";
+import NavigationProgress from "@/components/ui/NavigationProgress";
 import { StorageProvider } from "@/lib/storage/storage.provider";
 import { createClient } from "@/lib/supabase/server";
 
@@ -38,6 +39,9 @@ export default async function RootLayout({
     >
       <body className="min-h-screen bg-background text-foreground antialiased" suppressHydrationWarning>
         <StorageProvider userId={user?.id ?? null}>
+          {/* Top navigation progress bar for route transitions */}
+          <NavigationProgress />
+
           {/* Sidebar: visible on desktop (md+) */}
           <SideNav isLoggedIn={!!user} />
 

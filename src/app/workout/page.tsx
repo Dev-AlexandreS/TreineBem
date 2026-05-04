@@ -574,17 +574,36 @@ export default function WorkoutPage() {
         </>
       )}
 
-      {/* Fixed "Finalizar Treino" button (Req 6.7) — above BottomNav (h-16) */}
+      {/* Fixed "Finalizar Treino" button (Req 6.7)
+          Mobile: fixed above BottomNav (bottom-16)
+          Desktop: sticky bar at the bottom of the content column, no sidebar overlap */}
       {!finalized && (
-        <div className="fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent pt-4">
-          <button
-            type="button"
-            onClick={handleOpenSummary}
-            className="w-full max-w-2xl mx-auto block min-h-[56px] rounded-xl bg-green-600 text-white text-base font-bold hover:bg-green-500 active:bg-green-700 transition-colors shadow-lg"
-          >
-            Finalizar Treino
-          </button>
-        </div>
+        <>
+          {/* Mobile: fixed overlay above BottomNav */}
+          <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent pt-4">
+            <button
+              type="button"
+              onClick={handleOpenSummary}
+              className="w-full min-h-[56px] rounded-xl bg-green-600 text-white text-base font-bold hover:bg-green-500 active:bg-green-700 transition-colors shadow-lg"
+            >
+              Finalizar Treino
+            </button>
+          </div>
+
+          {/* Desktop: sticky bar inside the content column */}
+          <div className="hidden md:block sticky bottom-0 z-40 -mx-4 px-4 pb-4 pt-3 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent">
+            <button
+              type="button"
+              onClick={handleOpenSummary}
+              className="w-full max-w-2xl mx-auto flex items-center justify-center gap-2 min-h-[52px] rounded-xl bg-green-600 text-white text-base font-bold hover:bg-green-500 active:bg-green-700 transition-colors shadow-lg shadow-green-900/40"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Finalizar Treino
+            </button>
+          </div>
+        </>
       )}
     </div>
   )

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Toast from '@/components/ui/Toast';
+import FullScreenLoader from '@/components/ui/FullScreenLoader';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,9 +20,8 @@ export default function LoginPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       const isInvalidCredentials =
         error.code === 'invalid_credentials' || error.status === 400;
       const message = isInvalidCredentials
@@ -31,11 +31,14 @@ export default function LoginPage() {
       return;
     }
 
+    // Keep loading=true while router redirects — the overlay stays visible
     router.push('/');
   }
 
   return (
     <>
+      {loading && <FullScreenLoader message="Entrando..." />}
+
       <div className="bg-gray-900 rounded-2xl p-8 shadow-xl border border-gray-800">
         <h1 className="text-2xl font-bold text-white mb-6 text-center">Entrar</h1>
 
@@ -75,9 +78,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold transition-colors min-h-[44px]"
+            className="mt-2 w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold transition-colors min-h-[44px] flex items-center justify-center gap-2"
           >
-            {loading ? 'Entrando…' : 'Entrar'}
+            {loading ? (
+              <>
+                <span className="w-4 h-4 rounded-full border-2 border-blue-300 border-t-transparent animate-spin" aria-hidden="true" />
+                Entrando…
+              </>
+            ) : (
+              'Entrar'
+            )}
           </button>
         </form>
 

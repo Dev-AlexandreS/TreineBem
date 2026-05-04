@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Toast from '@/components/ui/Toast';
+import FullScreenLoader from '@/components/ui/FullScreenLoader';
 import { createUserRecord } from '../actions';
 
 export default function SignupPage() {
@@ -61,12 +62,14 @@ export default function SignupPage() {
       }
     }
 
-    setLoading(false);
+    // Keep loading=true while router redirects
     router.push('/');
   }
 
   return (
     <>
+      {loading && <FullScreenLoader message="Criando conta..." />}
+
       <div className="bg-gray-900 rounded-2xl p-8 shadow-xl border border-gray-800">
         <h1 className="text-2xl font-bold text-white mb-6 text-center">Criar conta</h1>
 
@@ -123,9 +126,16 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold transition-colors min-h-[44px]"
+            className="mt-2 w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold transition-colors min-h-[44px] flex items-center justify-center gap-2"
           >
-            {loading ? 'Criando conta…' : 'Criar conta'}
+            {loading ? (
+              <>
+                <span className="w-4 h-4 rounded-full border-2 border-blue-300 border-t-transparent animate-spin" aria-hidden="true" />
+                Criando conta…
+              </>
+            ) : (
+              'Criar conta'
+            )}
           </button>
         </form>
 

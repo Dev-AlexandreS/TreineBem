@@ -148,21 +148,23 @@ export default function BottomNav({ isLoggedIn = false }: { isLoggedIn?: boolean
       aria-label="Navegação principal"
     >
       {/* Settings gear icon — outside the 5 main slots, top-right corner */}
-      <div className="absolute -top-8 right-2">
-        <Link
-          href="/settings"
-          className={[
-            'flex items-center justify-center w-8 h-8 rounded-full bg-gray-800 border border-gray-700 transition-colors',
-            isSettingsActive
-              ? 'text-blue-400 border-blue-600'
-              : 'text-gray-400 hover:text-gray-100 hover:border-gray-500',
-          ].join(' ')}
-          aria-label="Configurações"
-          aria-current={isSettingsActive ? 'page' : undefined}
-        >
-          <GearIcon />
-        </Link>
-      </div>
+      {isLoggedIn && (
+        <div className="absolute -top-8 right-2">
+          <Link
+            href="/settings"
+            className={[
+              'flex items-center justify-center w-8 h-8 rounded-full bg-gray-800 border border-gray-700 transition-colors',
+              isSettingsActive
+                ? 'text-blue-400 border-blue-600'
+                : 'text-gray-400 hover:text-gray-100 hover:border-gray-500',
+            ].join(' ')}
+            aria-label="Configurações"
+            aria-current={isSettingsActive ? 'page' : undefined}
+          >
+            <GearIcon />
+          </Link>
+        </div>
+      )}
 
       <div className="flex items-stretch">
         {navItems.map((item) => {
