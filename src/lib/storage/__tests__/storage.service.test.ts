@@ -22,8 +22,8 @@ function clearStorage(): void {
 
 const arbDailyLog: fc.Arbitrary<DailyLog> = fc.record({
   date: fc
-    .date({ min: new Date('2020-01-01'), max: new Date('2025-12-31') })
-    .map((d) => d.toISOString().split('T')[0]),
+    .integer({ min: new Date('2020-01-01').getTime(), max: new Date('2025-12-31').getTime() })
+    .map((ts) => new Date(ts).toISOString().split('T')[0]),
   weight: fc.option(fc.float({ min: 30.0, max: 300.0, noNaN: true }), {
     nil: undefined,
   }),
