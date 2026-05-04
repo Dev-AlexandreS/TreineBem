@@ -4,6 +4,8 @@ export { validateExercise } from './exercise.validator';
 export { validateDailyLog } from './dailyLog.validator';
 export { validateGoals } from './goals.validator';
 export { validateExerciseExecution } from './exerciseExecution.validator';
+export { validateHeight, validateCheckinWeight, validateCheckinWater } from './settings.validator';
+export type { FieldValidationResult } from './settings.validator';
 
 import { validateExercise } from './exercise.validator';
 import { validateDailyLog } from './dailyLog.validator';

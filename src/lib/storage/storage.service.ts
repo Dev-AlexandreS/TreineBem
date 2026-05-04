@@ -5,7 +5,9 @@ import type {
   ExerciseExecution,
   Goals,
   ISODateString,
+  ProgressPhoto,
   StorageService,
+  UserSettings,
   WeeklyPlan,
 } from '@/types';
 import { localStorageAdapter } from './localStorage.adapter';
@@ -18,6 +20,8 @@ const KEYS = {
   DAILY_LOGS: 'daily-logs',
   EXECUTIONS: 'executions',
   GOALS: 'goals',
+  USER_SETTINGS: 'user-settings',
+  PROGRESS_PHOTOS: 'progress-photos',
 } as const;
 
 // ─── Implementation ───────────────────────────────────────────────────────────
@@ -156,6 +160,38 @@ export class LocalStorageStorageService implements StorageService {
 
   saveGoals(goals: Goals): void {
     localStorageAdapter.setItem(KEYS.GOALS, goals);
+  }
+
+  // ── User Settings ─────────────────────────────────────────────────────────────
+
+  getUserSettings(): UserSettings | null {
+    return localStorageAdapter.getItem<UserSettings | null>(KEYS.USER_SETTINGS, null);
+  }
+
+  saveUserSettings(settings: UserSettings): void {
+    localStorageAdapter.setItem(KEYS.USER_SETTINGS, settings);
+  }
+
+  // ── Progress Photos ───────────────────────────────────────────────────────────
+
+  getProgressPhotos(): ProgressPhoto[] {
+    return localStorageAdapter.getItem<ProgressPhoto[]>(KEYS.PROGRESS_PHOTOS, []);
+  }
+
+  saveProgressPhoto(photo: ProgressPhoto): void {
+    const photos = this.getProgressPhotos();
+    const index = photos.findIndex((p) => p.id === photo.id);
+    if (index !== -1) {
+      photos[index] = photo;
+    } else {
+      photos.push(photo);
+    }
+    localStorageAdapter.setItem(KEYS.PROGRESS_PHOTOS, photos);
+  }
+
+  deleteProgressPhoto(id: string): void {
+    const photos = this.getProgressPhotos().filter((p) => p.id !== id);
+    localStorageAdapter.setItem(KEYS.PROGRESS_PHOTOS, photos);
   }
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { storageService } from '@/lib/storage/storage.service';
 import {
   calculateStreak,
@@ -8,6 +8,8 @@ import {
   calculateAverageWater,
   calculateWeightLost,
 } from '@/lib/calculators';
+import { isPerfectWeek } from '@/lib/calculators/streak.calculator';
+import type { DayStatus } from '@/components/dashboard/WeeklyConsistencyIndicator';
 import type {
   DailyLog,
   DayOfWeek,
@@ -60,15 +62,50 @@ function getTodayDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Returns a date N days ago as ISO string */
+function getDateDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const DOW_MAP: DayOfWeek[] = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface WeekSummary {
+  trainedCount: number;
+  plannedCount: number;
+  averageWater: number;
+  weekStartWeight: number | null;
+  currentWeight: number | null;
+  weightDiff: number | null;
+}
+
+export interface WeekConsistencyDay {
+  dayLabel: string;
+  status: DayStatus;
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
- * Hook that aggregates all data needed for the dashboard view.
+ * Hook que agrega todos os dados necessários para o Dashboard.
  *
- * On mount it loads goals, all daily logs (from 2020-01-01 to today), and the
- * weekly plan, then derives the computed metrics exposed to the consumer.
- *
- * Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9
+ * Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 5.1, 5.5, 10.2, 10.3, 12.4
  */
 export function useDashboard(): {
   currentWeight: number | null;
@@ -79,11 +116,16 @@ export function useDashboard(): {
   averageWater: number;
   todayPlan: DayPlan | null;
   todayDayType: DayType | null;
+  todayLog: DailyLog | null;
   allLogs: DailyLog[];
   weeklyPlan: WeeklyPlan | null;
   goals: Goals | null;
+  weekSummary: WeekSummary | null;
+  weekConsistencyDays: WeekConsistencyDay[];
+  isPerfectWeekResult: boolean;
   isLoading: boolean;
   error: StorageError | null;
+  saveDailyCheckin: (weight?: number, water?: number) => Promise<void>;
 } {
   const [allLogs, setAllLogs] = useState<DailyLog[]>([]);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
@@ -113,52 +155,158 @@ export function useDashboard(): {
 
   // ── Derived values ────────────────────────────────────────────────────────────
 
-  /**
-   * Weight from the log with the most recent date that has `weight` defined.
-   * Requirements: 1.2
-   */
   const currentWeight: number | null = (() => {
     const logsWithWeight = allLogs
       .filter((log) => log.weight !== undefined && log.weight !== null)
       .sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
-
     return logsWithWeight.length > 0 ? (logsWithWeight[0].weight as number) : null;
   })();
 
-  /** Target weight from goals. Requirements: 1.3 */
   const targetWeight: number | null = goals?.targetWeight ?? null;
 
-  /**
-   * Weight lost = initialWeight - currentWeight (positive means lost weight).
-   * Only computed when both initialWeight (from goals) and currentWeight are available.
-   * Requirements: 1.4
-   */
   const weightLost: number | null =
     goals !== null && goals.initialWeight !== undefined && currentWeight !== null
       ? calculateWeightLost(goals.initialWeight, currentWeight)
       : null;
 
-  /** Consecutive days with a log entry ending at today (or yesterday). Requirements: 1.5 */
   const streak: number = calculateStreak(allLogs);
 
-  /**
-   * Fraction of planned training days completed this week.
-   * Requirements: 1.6
-   */
   const weeklyCompletionRate: number =
     weeklyPlan !== null
       ? calculateWeeklyCompletionRate(allLogs, weeklyPlan, getMondayOfCurrentWeek())
       : 0;
 
-  /** Average water intake over the last 7 days. Requirements: 1.7 */
   const averageWater: number = calculateAverageWater(allLogs, 7);
 
-  /** The DayPlan for today from the weekly plan. Requirements: 1.8 */
   const todayPlan: DayPlan | null =
     weeklyPlan !== null ? weeklyPlan[getDayOfWeek()] : null;
 
-  /** The dayType for today. Requirements: 1.9 */
   const todayDayType: DayType | null = todayPlan?.dayType ?? null;
+
+  /** Log do dia atual para pré-preencher o DailyCheckin */
+  const todayLog: DailyLog | null = (() => {
+    const today = getTodayDate();
+    return allLogs.find((l) => l.date === today) ?? null;
+  })();
+
+  /** Resumo semanal */
+  const weekSummary: WeekSummary | null = (() => {
+    if (weeklyPlan === null) return null;
+
+    const monday = getMondayOfCurrentWeek();
+    const weekLogs: DailyLog[] = [];
+    let plannedCount = 0;
+    let trainedCount = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dow = DOW_MAP[d.getDay()];
+      const dayPlan = weeklyPlan[dow];
+
+      if (dayPlan.dayType !== 'rest') plannedCount++;
+
+      const log = allLogs.find((l) => l.date === dateStr);
+      if (log) {
+        weekLogs.push(log);
+        if (log.trained) trainedCount++;
+      }
+    }
+
+    const weekAvgWater = calculateAverageWater(weekLogs, 7);
+
+    // Peso no início da semana (log mais antigo da semana com peso)
+    const weekLogsWithWeight = weekLogs
+      .filter((l) => l.weight !== undefined)
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    const weekStartWeight = weekLogsWithWeight.length > 0
+      ? (weekLogsWithWeight[0].weight as number)
+      : null;
+
+    const weightDiff =
+      weekStartWeight !== null && currentWeight !== null
+        ? currentWeight - weekStartWeight
+        : null;
+
+    return {
+      trainedCount,
+      plannedCount,
+      averageWater: weekAvgWater,
+      weekStartWeight,
+      currentWeight,
+      weightDiff,
+    };
+  })();
+
+  /** Dias de consistência semanal para o WeeklyConsistencyIndicator */
+  const weekConsistencyDays: WeekConsistencyDay[] = (() => {
+    if (weeklyPlan === null) return [];
+
+    const monday = getMondayOfCurrentWeek();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const result: WeekConsistencyDay[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dow = DOW_MAP[d.getDay()];
+      const dayPlan = weeklyPlan[dow];
+      const log = allLogs.find((l) => l.date === dateStr);
+
+      let status: DayStatus;
+      if (d > today) {
+        status = 'future';
+      } else if (dayPlan.dayType === 'rest') {
+        status = 'rest';
+      } else if (log?.trained) {
+        status = 'trained';
+      } else {
+        status = 'missed';
+      }
+
+      result.push({ dayLabel: DAY_LABELS[d.getDay()], status });
+    }
+
+    return result;
+  })();
+
+  /** Semana perfeita */
+  const isPerfectWeekResult: boolean = (() => {
+    if (weeklyPlan === null) return false;
+    return isPerfectWeek(weeklyPlan, allLogs, getMondayOfCurrentWeek());
+  })();
+
+  // ── Save daily check-in ───────────────────────────────────────────────────────
+
+  const saveDailyCheckin = useCallback(
+    async (weight?: number, water?: number): Promise<void> => {
+      const today = getTodayDate();
+      const existing = allLogs.find((l) => l.date === today);
+
+      const updatedLog: DailyLog = {
+        date: today,
+        trained: existing?.trained ?? false,
+        followedPlan: existing?.followedPlan ?? false,
+        didSomethingDifferent: existing?.didSomethingDifferent ?? false,
+        weight: weight !== undefined ? weight : existing?.weight,
+        waterLiters: water !== undefined ? water : existing?.waterLiters,
+        notes: existing?.notes,
+        differentDescription: existing?.differentDescription,
+      };
+
+      storageService.saveDailyLog(updatedLog);
+
+      // Update local state
+      setAllLogs((prev) => {
+        const filtered = prev.filter((l) => l.date !== today);
+        return [...filtered, updatedLog];
+      });
+    },
+    [allLogs]
+  );
 
   return {
     currentWeight,
@@ -169,10 +317,15 @@ export function useDashboard(): {
     averageWater,
     todayPlan,
     todayDayType,
+    todayLog,
     allLogs,
     weeklyPlan,
     goals,
+    weekSummary,
+    weekConsistencyDays,
+    isPerfectWeekResult,
     isLoading,
     error,
+    saveDailyCheckin,
   };
 }

@@ -3,46 +3,15 @@
 import { useState } from 'react'
 import { useGoals } from '@/hooks/useGoals'
 import { useDashboard } from '@/hooks/useDashboard'
+import { useSettings } from '@/hooks/useSettings'
+import { useToast } from '@/hooks/useToast'
 import GoalsForm from '@/components/forms/GoalsForm'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import ProgressBar from '@/components/ui/ProgressBar'
+import SkeletonCard from '@/components/ui/SkeletonCard'
+import BMICard from '@/components/goals/BMICard'
+import { ToastStack } from '@/components/ui/Toast'
+import { calculateBMI } from '@/lib/calculators/bmi.calculator'
 import type { Goals } from '@/types'
-
-// ─── Progress bar ─────────────────────────────────────────────────────────────
-
-interface ProgressBarProps {
-  /** 0–1 clamped fraction */
-  value: number
-  /** Colour variant */
-  variant?: 'blue' | 'green' | 'yellow'
-}
-
-function ProgressBar({ value, variant = 'blue' }: ProgressBarProps) {
-  const clamped = Math.min(1, Math.max(0, value))
-  const pct = Math.round(clamped * 100)
-
-  const trackColour = 'bg-gray-700'
-  const fillColour =
-    variant === 'green'
-      ? 'bg-green-500'
-      : variant === 'yellow'
-      ? 'bg-yellow-500'
-      : 'bg-blue-500'
-
-  return (
-    <div
-      role="progressbar"
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      className={`w-full h-2 rounded-full overflow-hidden ${trackColour}`}
-    >
-      <div
-        className={`h-full rounded-full transition-all duration-300 ${fillColour}`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
-}
 
 // ─── Progress card ────────────────────────────────────────────────────────────
 
@@ -51,20 +20,20 @@ interface ProgressCardProps {
   current: string
   goal: string
   fraction: number
-  variant?: 'blue' | 'green' | 'yellow'
+  variant?: 'blue' | 'green' | 'yellow' | 'red'
   note?: string
 }
 
-function ProgressCard({ label, current, goal, fraction, variant, note }: ProgressCardProps) {
+function ProgressCard({ label, current, goal, fraction, variant = 'blue', note }: ProgressCardProps) {
   return (
-    <div className="rounded-xl bg-gray-800 border border-gray-700 p-4 space-y-2">
+    <div className="rounded-2xl bg-gray-800 border border-gray-700 p-4 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-gray-300">{label}</span>
         <span className="text-xs text-gray-400 shrink-0">
           {current} / {goal}
         </span>
       </div>
-      <ProgressBar value={fraction} variant={variant} />
+      <ProgressBar value={fraction} variant={variant} label={label} />
       {note && <p className="text-xs text-gray-500">{note}</p>}
     </div>
   )
@@ -73,17 +42,17 @@ function ProgressCard({ label, current, goal, fraction, variant, note }: Progres
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 /**
- * Goals page — displays current progress against each goal and allows the
- * user to create or update their fitness goals.
+ * Página de Metas com barras de progresso, IMC e formulário de edição.
  *
- * Requirements: 8.1, 8.7, 8.8, 8.9, 8.10
+ * Requirements: 9.1–9.8, 13.3, 13.4
  */
 export default function GoalsPage() {
   const { goals, saveGoals } = useGoals()
   const { currentWeight, weeklyCompletionRate, averageWater, isLoading } = useDashboard()
+  const { settings } = useSettings()
+  const { toasts, showSuccess, showError, dismiss } = useToast()
 
   const [isEditing, setIsEditing] = useState(false)
-  const [saved, setSaved] = useState(false)
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -91,33 +60,31 @@ export default function GoalsPage() {
     const ok = saveGoals(newGoals)
     if (ok) {
       setIsEditing(false)
-      setSaved(true)
-      // Hide the success banner after 3 s
-      setTimeout(() => setSaved(false), 3000)
+      showSuccess('Metas salvas com sucesso!')
+    } else {
+      showError('Erro ao salvar metas. Verifique os campos.')
     }
-  }
-
-  function handleCancel() {
-    setIsEditing(false)
   }
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner />
+      <div className="p-4 max-w-2xl mx-auto space-y-4">
+        <div className="h-8 bg-gray-700 rounded-full w-1/4 animate-pulse" />
+        <SkeletonCard lines={3} height={100} />
+        <SkeletonCard lines={3} height={100} />
       </div>
     )
   }
 
-  // ── No goals yet — show form directly ─────────────────────────────────────
+  // ── No goals yet ───────────────────────────────────────────────────────────
 
   if (goals === null && !isEditing) {
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-6">
+        <ToastStack toasts={toasts} onDismiss={dismiss} />
         <h1 className="text-2xl font-bold text-white">Metas</h1>
-
         <div className="rounded-2xl bg-gray-800 border border-gray-700 p-4">
           <p className="text-sm text-gray-400 mb-4">
             Defina suas metas para acompanhar seu progresso.
@@ -128,13 +95,8 @@ export default function GoalsPage() {
     )
   }
 
-  // ── Derived progress values ────────────────────────────────────────────────
+  // ── Derived values ─────────────────────────────────────────────────────────
 
-  /**
-   * Weight progress: how far the user has moved from initialWeight toward
-   * targetWeight. Clamped to [0, 1].
-   * Requirements: 8.9
-   */
   const weightFraction: number = (() => {
     if (goals === null || currentWeight === null) return 0
     const total = goals.initialWeight - goals.targetWeight
@@ -143,31 +105,34 @@ export default function GoalsPage() {
     return done / total
   })()
 
-  /**
-   * Water progress: average daily water vs goal.
-   * Requirements: 8.9
-   */
   const waterFraction: number =
     goals !== null && goals.dailyWaterLiters > 0
       ? averageWater / goals.dailyWaterLiters
       : 0
 
-  /**
-   * Workout frequency: weeklyCompletionRate is already a 0–1 fraction of
-   * planned workout days completed this week.
-   * Requirements: 8.9
-   */
   const workoutFraction: number = weeklyCompletionRate
 
-  // ── Congratulations condition ──────────────────────────────────────────────
-  // Requirements: 8.10
   const showCongrats =
     goals !== null && currentWeight !== null && currentWeight <= goals.targetWeight
+
+  const weightRemaining =
+    goals !== null && currentWeight !== null && currentWeight > goals.targetWeight
+      ? currentWeight - goals.targetWeight
+      : null
+
+  // IMC
+  const heightCm = settings?.heightCm ?? null
+  const bmiResult =
+    currentWeight !== null && heightCm !== null
+      ? calculateBMI(currentWeight, heightCm)
+      : null
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-6 pb-24">
+      <ToastStack toasts={toasts} onDismiss={dismiss} />
+
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-white">Metas</h1>
@@ -175,25 +140,14 @@ export default function GoalsPage() {
           <button
             type="button"
             onClick={() => setIsEditing(true)}
-            className="min-h-[44px] min-w-[44px] px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-700 hover:text-white transition-colors"
+            className="min-h-[44px] px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-700 hover:text-white transition-colors"
           >
             Editar
           </button>
         )}
       </div>
 
-      {/* Success banner */}
-      {saved && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-xl bg-green-950 border border-green-700 px-4 py-3 text-sm text-green-400 font-medium"
-        >
-          Metas salvas com sucesso! ✓
-        </div>
-      )}
-
-      {/* Congratulations banner — Requirement 8.10 */}
+      {/* Parabéns banner (Req 9.3) */}
       {showCongrats && (
         <div
           role="status"
@@ -209,103 +163,104 @@ export default function GoalsPage() {
         </div>
       )}
 
-      {/* Progress section — Requirements 8.9 */}
+      {/* Progresso (Req 9.1–9.2) */}
       {goals !== null && !isEditing && (
-        <section aria-label="Progresso atual">
-          <h2 className="text-base font-semibold text-white mb-3">Progresso atual</h2>
-
-          <div className="space-y-3">
-            {/* Weight progress */}
-            <ProgressCard
-              label="Peso"
-              current={
-                currentWeight !== null ? `${currentWeight.toFixed(1)} kg` : '—'
-              }
-              goal={`${goals.targetWeight.toFixed(1)} kg`}
-              fraction={weightFraction}
-              variant={showCongrats ? 'green' : 'blue'}
-              note={
-                currentWeight !== null
-                  ? `Peso inicial: ${goals.initialWeight.toFixed(1)} kg`
-                  : 'Nenhum peso registrado ainda'
-              }
-            />
-
-            {/* Water progress */}
-            <ProgressCard
-              label="Água diária (média 7 dias)"
-              current={`${averageWater.toFixed(1)} L`}
-              goal={`${goals.dailyWaterLiters.toFixed(1)} L`}
-              fraction={waterFraction}
-              variant={waterFraction >= 1 ? 'green' : 'blue'}
-            />
-
-            {/* Workout frequency */}
-            <ProgressCard
-              label="Treinos esta semana"
-              current={`${Math.round(workoutFraction * goals.weeklyWorkouts)} treinos`}
-              goal={`${goals.weeklyWorkouts} treinos`}
-              fraction={workoutFraction}
-              variant={workoutFraction >= 1 ? 'green' : 'blue'}
-            />
-
-            {/* Cardio goal — display only, no tracking data yet */}
-            <div className="rounded-xl bg-gray-800 border border-gray-700 p-4 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-gray-300">
-                  Meta de cardio semanal
-                </span>
-                <span className="text-xs text-gray-400 shrink-0">
-                  {goals.weeklyCardioMinutes} min / semana
-                </span>
+        <>
+          {/* Cartão de peso (Req 9.2) */}
+          <div className="rounded-2xl bg-gray-800 border border-gray-700 p-4 space-y-3">
+            <h2 className="text-base font-semibold text-white">Progresso de Peso</h2>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-xs text-gray-400">Inicial</p>
+                <p className="text-lg font-bold text-white">{goals.initialWeight.toFixed(1)}</p>
+                <p className="text-xs text-gray-500">kg</p>
               </div>
-              <p className="text-xs text-gray-500">
-                Registre cardio durante o treino para acompanhar o progresso.
+              <div>
+                <p className="text-xs text-gray-400">Atual</p>
+                <p className={`text-lg font-bold ${currentWeight !== null ? 'text-white' : 'text-gray-500'}`}>
+                  {currentWeight !== null ? currentWeight.toFixed(1) : '—'}
+                </p>
+                <p className="text-xs text-gray-500">kg</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Alvo</p>
+                <p className="text-lg font-bold text-blue-400">{goals.targetWeight.toFixed(1)}</p>
+                <p className="text-xs text-gray-500">kg</p>
+              </div>
+            </div>
+            <ProgressBar
+              value={weightFraction}
+              variant={showCongrats ? 'green' : 'blue'}
+              label="Progresso de peso"
+            />
+            {weightRemaining !== null && (
+              <p className="text-xs text-gray-400 text-center">
+                Faltam <span className="text-white font-medium">{weightRemaining.toFixed(1)} kg</span> para sua meta
               </p>
-            </div>
+            )}
           </div>
-        </section>
+
+          {/* Barras de progresso (Req 9.1) */}
+          <section aria-label="Progresso atual">
+            <h2 className="text-base font-semibold text-white mb-3">Progresso atual</h2>
+            <div className="space-y-3">
+              <ProgressCard
+                label="Água diária (média 7 dias)"
+                current={`${averageWater.toFixed(1)} L`}
+                goal={`${goals.dailyWaterLiters.toFixed(1)} L`}
+                fraction={waterFraction}
+                variant={waterFraction >= 1 ? 'green' : 'blue'}
+              />
+              <ProgressCard
+                label="Treinos esta semana"
+                current={`${Math.round(workoutFraction * goals.weeklyWorkouts)} treinos`}
+                goal={`${goals.weeklyWorkouts} treinos`}
+                fraction={workoutFraction}
+                variant={workoutFraction >= 1 ? 'green' : 'blue'}
+              />
+              <div className="rounded-2xl bg-gray-800 border border-gray-700 p-4 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-gray-300">Meta de cardio semanal</span>
+                  <span className="text-xs text-gray-400 shrink-0">
+                    {goals.weeklyCardioMinutes} min / semana
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Registre cardio durante o treino para acompanhar o progresso.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* IMC (Req 9.4, 13.3, 13.4) */}
+          <BMICard
+            bmi={bmiResult?.value ?? null}
+            classification={bmiResult?.classification ?? null}
+            heightCm={heightCm}
+          />
+
+          {/* Metas definidas */}
+          <section aria-label="Metas definidas">
+            <h2 className="text-base font-semibold text-white mb-3">Metas definidas</h2>
+            <dl className="rounded-2xl bg-gray-800 border border-gray-700 divide-y divide-gray-700">
+              {[
+                { label: 'Peso inicial', value: `${goals.initialWeight.toFixed(1)} kg` },
+                { label: 'Peso alvo', value: `${goals.targetWeight.toFixed(1)} kg` },
+                { label: 'Água diária', value: `${goals.dailyWaterLiters.toFixed(1)} L` },
+                { label: 'Treinos por semana', value: String(goals.weeklyWorkouts) },
+                { label: 'Cardio semanal', value: `${goals.weeklyCardioMinutes} min` },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between px-4 py-3">
+                  <dt className="text-sm text-gray-400">{label}</dt>
+                  <dd className="text-sm font-medium text-white">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </>
       )}
 
-      {/* Goals summary (when not editing) */}
-      {goals !== null && !isEditing && (
-        <section aria-label="Metas definidas">
-          <h2 className="text-base font-semibold text-white mb-3">Metas definidas</h2>
-
-          <dl className="rounded-2xl bg-gray-800 border border-gray-700 divide-y divide-gray-700">
-            <div className="flex items-center justify-between px-4 py-3">
-              <dt className="text-sm text-gray-400">Peso inicial</dt>
-              <dd className="text-sm font-medium text-white">
-                {goals.initialWeight.toFixed(1)} kg
-              </dd>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <dt className="text-sm text-gray-400">Peso alvo</dt>
-              <dd className="text-sm font-medium text-white">
-                {goals.targetWeight.toFixed(1)} kg
-              </dd>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <dt className="text-sm text-gray-400">Água diária</dt>
-              <dd className="text-sm font-medium text-white">
-                {goals.dailyWaterLiters.toFixed(1)} L
-              </dd>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <dt className="text-sm text-gray-400">Treinos por semana</dt>
-              <dd className="text-sm font-medium text-white">{goals.weeklyWorkouts}</dd>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <dt className="text-sm text-gray-400">Cardio semanal</dt>
-              <dd className="text-sm font-medium text-white">
-                {goals.weeklyCardioMinutes} min
-              </dd>
-            </div>
-          </dl>
-        </section>
-      )}
-
-      {/* Edit form */}
+      {/* Formulário de edição */}
       {isEditing && (
         <section
           aria-label="Editar metas"
@@ -315,7 +270,7 @@ export default function GoalsPage() {
           <GoalsForm
             goals={goals ?? undefined}
             onSave={handleSave}
-            onCancel={handleCancel}
+            onCancel={() => setIsEditing(false)}
           />
         </section>
       )}

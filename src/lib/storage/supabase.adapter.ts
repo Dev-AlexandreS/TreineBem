@@ -1,7 +1,9 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
+import { createClient } from '@/lib/supabase/server';
 import { Prisma } from '@prisma/client';
 import { defaultWeeklyPlan } from './defaultPlan';
+import { localStorageAdapter } from './localStorage.adapter';
 import {
   StorageError,
   type DailyLog,
@@ -12,6 +14,8 @@ import {
   type ExerciseExecution,
   type Goals,
   type ISODateString,
+  type ProgressPhoto,
+  type UserSettings,
   type WeeklyPlan,
 } from '@/types';
 
@@ -457,6 +461,110 @@ export class SupabaseAdapter {
       }
     } catch (error) {
       throw toPrismaStorageError(error, 'saveGoals');
+    }
+  }
+
+  // ── User Settings ────────────────────────────────────────────────────────────
+  // Settings are stored in localStorage (client-side) since they are user-local
+  // preferences. The SupabaseAdapter is server-only, so we delegate to localStorage.
+
+  getUserSettings(): UserSettings | null {
+    return localStorageAdapter.getItem<UserSettings | null>('user-settings', null);
+  }
+
+  saveUserSettings(settings: UserSettings): void {
+    localStorageAdapter.setItem('user-settings', settings);
+  }
+
+  // ── Progress Photos ──────────────────────────────────────────────────────────
+
+  /**
+   * Retrieves all progress photos for the user from the database.
+   * Returns metadata only; the actual image URLs are signed URLs from Supabase Storage.
+   */
+  async getProgressPhotos(): Promise<ProgressPhoto[]> {
+    try {
+      const rows = await prisma.progressPhoto.findMany({
+        where: { user_id: this.userId },
+        orderBy: { date: 'asc' },
+      });
+
+      const supabase = await createClient();
+
+      const photos: ProgressPhoto[] = await Promise.all(
+        rows.map(async (row) => {
+          // Generate a signed URL valid for 1 hour
+          const { data } = await supabase.storage
+            .from('progress-photos')
+            .createSignedUrl(row.storage_path, 3600);
+
+          return {
+            id: row.id,
+            date: row.date instanceof Date
+              ? row.date.toISOString().split('T')[0]
+              : String(row.date),
+            url: data?.signedUrl ?? '',
+            storagePath: row.storage_path,
+          };
+        })
+      );
+
+      return photos;
+    } catch (error) {
+      throw toPrismaStorageError(error, 'getProgressPhotos');
+    }
+  }
+
+  /**
+   * Uploads a photo file to Supabase Storage and saves metadata to the database.
+   * The storage path follows the pattern: {userId}/{photoId}.{ext}
+   */
+  async saveProgressPhoto(photo: ProgressPhoto & { file?: File }): Promise<void> {
+    try {
+      if (photo.storagePath) {
+        // Metadata-only update (no new file)
+        await prisma.progressPhoto.upsert({
+          where: { id: photo.id },
+          update: {
+            date: new Date(photo.date),
+            storage_path: photo.storagePath,
+          },
+          create: {
+            id: photo.id,
+            user_id: this.userId,
+            date: new Date(photo.date),
+            storage_path: photo.storagePath,
+          },
+        });
+      }
+    } catch (error) {
+      throw toPrismaStorageError(error, 'saveProgressPhoto');
+    }
+  }
+
+  /**
+   * Deletes a progress photo from both Supabase Storage and the database.
+   */
+  async deleteProgressPhoto(id: string): Promise<void> {
+    try {
+      const row = await prisma.progressPhoto.findUnique({
+        where: { id, user_id: this.userId },
+      });
+
+      if (!row) return;
+
+      // Delete from Supabase Storage first
+      const supabase = await createClient();
+      await supabase.storage
+        .from('progress-photos')
+        .remove([row.storage_path]);
+
+      // Then delete the metadata record
+      await prisma.progressPhoto.delete({
+        where: { id, user_id: this.userId },
+      });
+    } catch (error) {
+      throw toPrismaStorageError(error, 'deleteProgressPhoto');
     }
   }
 }
